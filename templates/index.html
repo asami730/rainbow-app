@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>虹を描こう</title>
+    <!-- キャプチャ用ライブラリ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         /* 全体のステージ設定 */
         .stage {
@@ -14,7 +16,7 @@
             margin: 0 auto;
         }
 
-        /* 虹のSVG配置位置（画像に合わせて微調整可能） */
+        /* 虹のSVG配置位置 */
         .rainbow-svg {
             position: absolute;
             top: 100px;
@@ -34,7 +36,7 @@
 
         /* 選択中の段を強調表示するスタイル */
         .arc.selected {
-            stroke-dasharray: 4; /* 選択中であることがわかるように点線風にする */
+            stroke-dasharray: 4; /* 点線風にする */
         }
 
         /* 操作用の透明クリックエリアの共通スタイル */
@@ -42,7 +44,6 @@
             position: absolute;
             cursor: pointer;
             border-radius: 50%;
-            /* 位置調整用の赤枠（位置が決まったら border: none; にします） */
             border: none; 
         }
 
@@ -52,6 +53,33 @@
             font-size: 18px;
             margin-top: 15px;
             font-weight: bold;
+        }
+
+        /* みんなのギャラリーのスタイル */
+        .gallery-container {
+            max-width: 800px;
+            margin: 40px auto;
+            text-align: center;
+        }
+        .gallery-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        .gallery-item {
+            border: 2px solid #ddd;
+            padding: 5px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .gallery-item img {
+            width: 150px;
+            height: auto;
+            display: block;
+            border-radius: 4px;
         }
     </style>
 </head>
@@ -69,7 +97,7 @@
             <path id="arc-7" class="arc" d="M 140,200 A 60,60 0 0,1 260,200" onclick="selectStep(7)" />
         </svg>
 
-        <!-- 左側の数字ボタン（画像に合わせて配置） -->
+        <!-- 左側の数字ボタン -->
         <div class="click-area" style="top: 10px; left: 20px; width: 70px; height: 70px;" onclick="selectStep(1)"></div>
         <div class="click-area" style="top: 95px; left: 20px; width: 70px; height: 70px;" onclick="selectStep(2)"></div>
         <div class="click-area" style="top: 175px; left: 20px; width: 70px; height: 70px;" onclick="selectStep(3)"></div>
@@ -78,7 +106,7 @@
         <div class="click-area" style="top: 430px; left: 20px; width: 70px; height: 70px;" onclick="selectStep(6)"></div>
         <div class="click-area" style="top: 510px; left: 20px; width: 70px; height: 70px;" onclick="selectStep(7)"></div>
 
-        <!-- 下側のカラーパレットボタン（画像に合わせて配置） -->
+        <!-- 下側のカラーパレットボタン -->
         <div class="click-area" style="top: 500px; left: 110px; width: 85px; height: 85px;" onclick="applyColor('#FF0000')"></div> <!-- 赤 -->
         <div class="click-area" style="top: 500px; left: 200px; width: 85px; height: 85px;" onclick="applyColor('#FFA500')"></div> <!-- 橙 -->
         <div class="click-area" style="top: 500px; left: 285px; width: 85px; height: 85px;" onclick="applyColor('#FFFF00')"></div> <!-- 黄 -->
@@ -86,51 +114,80 @@
         <div class="click-area" style="top: 500px; left: 460px; width: 85px; height: 85px;" onclick="applyColor('#87CEEB')"></div> <!-- 水 -->
         <div class="click-area" style="top: 500px; left: 545px; width: 85px; height: 85px;" onclick="applyColor('#0000FF')"></div> <!-- 青 -->
         <div class="click-area" style="top: 500px; left: 635px; width: 85px; height: 85px;" onclick="applyColor('#800080')"></div> <!-- 紫 -->
+
+        <!-- ★ 右下の白い四角の位置（必要に応じて left や top の数値を微調整してください） -->
+        <div class="click-area" style="top: 500px; left: 715px; width: 75px; height: 75px; background: rgba(255,255,255,0.2);" onclick="saveArtwork()" title="ここをクリックしてギャラリーに保存！"></div>
     </div>
 
     <!-- 案内表示 -->
     <div id="status" class="status-display">「数字」または「虹の線」を選んでから、「色」を押してね！</div>
 
+    <!-- みんなの作品ギャラリー（最新10件） -->
+    <div class="gallery-container">
+        <h3>みんなの作品ギャラリー（最新10件）</h3>
+        <div class="gallery-grid">
+            {% for img in images %}
+                <div class="gallery-item">
+                    <img src="{{ img }}" alt="みんなの作品">
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
     <script>
-        // 現在えらばれている段番号（最初は未選択）
         let selectedStep = null;
 
-        // 段を選択する関数
         function selectStep(step) {
             selectedStep = step;
-            
-            // すべての線の選択状態を解除
             for (let i = 1; i <= 7; i++) {
                 document.getElementById('arc-' + i).classList.remove('selected');
             }
-            
-            // 選んだ線だけ強調表示（点線にする）
             document.getElementById('arc-' + step).classList.add('selected');
-
-            // メッセージ更新
             document.getElementById('status').innerText = step + '段目がえらばれました！下の色を押してね。';
         }
 
-        // 色を塗る関数
         function applyColor(color) {
             if (selectedStep === null) {
-                alert('先に左の「数字」または「虹の線」を選んでね！');
+                alert('先に左の「数字」または「虹の線」を選びましょう');
                 return;
             }
 
-            // 選択中の段に色を塗る
             const targetArc = document.getElementById('arc-' + selectedStep);
             targetArc.style.stroke = color;
-            targetArc.classList.remove('selected'); // 強調解除
+            targetArc.classList.remove('selected');
 
-            document.getElementById('status').innerText = selectedStep + '段目を塗りました！次の数字を選んでね。';
-            
-            // 次の段へ自動で進むと使いやすい
-            if (selectedStep > 1) {
-                selectStep(selectedStep - 1);
-            } else {
-                selectedStep = null;
-            }
+            document.getElementById('status').innerText = selectedStep + '段目を塗りました！';
+            selectedStep = null;
+        }
+
+        // 作品をキャプチャしてサーバーへ保存する関数
+        function saveArtwork() {
+            const targetElement = document.querySelector('.stage');
+
+            html2canvas(targetElement).then(canvas => {
+                const imageData = canvas.toDataURL('image/png');
+
+                fetch('/save_artwork', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ image_data: imageData })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('作品をみんなのギャラリーに保存しました！');
+                        location.reload(); // ページを更新して一覧に反映
+                    } else {
+                        alert('保存に失敗しました。');
+                    }
+                })
+                .catch(error => {
+                    console.error('エラー:', error);
+                    alert('保存処理でエラーが発生しました。');
+                });
+            });
         }
     </script>
 
